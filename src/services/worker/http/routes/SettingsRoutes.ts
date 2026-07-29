@@ -88,6 +88,14 @@ export class SettingsRoutes extends BaseRouteHandler {
       'CLAUDE_MEM_OPENROUTER_MODEL',
       'CLAUDE_MEM_OPENROUTER_SITE_URL',
       'CLAUDE_MEM_OPENROUTER_APP_NAME',
+      'CLAUDE_MEM_CODEX_PATH',
+      'CLAUDE_MEM_CODEX_REASONING_EFFORT',
+      'CLAUDE_MEM_CODEX_TIMEOUT_MS',
+      'CLAUDE_MEM_TIER_ROUTING_ENABLED',
+      'CLAUDE_MEM_TIER_SIMPLE_MODEL',
+      'CLAUDE_MEM_TIER_SUMMARY_MODEL',
+      'CLAUDE_MEM_TIER_FAST_MODEL',
+      'CLAUDE_MEM_TIER_SMART_MODEL',
       'CLAUDE_MEM_DATA_DIR',
       'CLAUDE_MEM_LOG_LEVEL',
       'CLAUDE_MEM_PYTHON_VERSION',
@@ -119,6 +127,9 @@ export class SettingsRoutes extends BaseRouteHandler {
     if (typeof settings.CLAUDE_CODE_PATH === 'string' && settings.CLAUDE_CODE_PATH) {
       settings.CLAUDE_CODE_PATH = expandTilde(settings.CLAUDE_CODE_PATH);
     }
+    if (typeof settings.CLAUDE_MEM_CODEX_PATH === 'string' && settings.CLAUDE_MEM_CODEX_PATH) {
+      settings.CLAUDE_MEM_CODEX_PATH = expandTilde(settings.CLAUDE_MEM_CODEX_PATH);
+    }
 
     writeJsonFileAtomic(settingsPath, settings);
 
@@ -142,9 +153,9 @@ export class SettingsRoutes extends BaseRouteHandler {
 
   private validateSettings(settings: any): { valid: boolean; error?: string } {
     if (settings.CLAUDE_MEM_PROVIDER) {
-    const validProviders = ['claude', 'gemini', 'openrouter'];
-    if (!validProviders.includes(settings.CLAUDE_MEM_PROVIDER)) {
-      return { valid: false, error: 'CLAUDE_MEM_PROVIDER must be "claude", "gemini", or "openrouter"' };
+      const validProviders = ['claude', 'gemini', 'openrouter', 'codex'];
+      if (!validProviders.includes(settings.CLAUDE_MEM_PROVIDER)) {
+        return { valid: false, error: 'CLAUDE_MEM_PROVIDER must be "claude", "gemini", "openrouter", or "codex"' };
       }
     }
 

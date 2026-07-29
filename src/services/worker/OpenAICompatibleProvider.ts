@@ -40,7 +40,7 @@ export interface ProviderQueryResult {
  * resolution, request shape, token estimation, usage/cost reporting) are
  * supplied by abstract members.
  */
-export abstract class OpenAICompatibleProvider<TConfig extends { apiKey: string; model: string }> {
+export abstract class OpenAICompatibleProvider<TConfig extends { model: string }> {
   protected dbManager: DatabaseManager;
   protected sessionManager: SessionManager;
 
@@ -61,11 +61,11 @@ export abstract class OpenAICompatibleProvider<TConfig extends { apiKey: string;
     this.sessionManager = sessionManager;
   }
 
-  /** Resolve API key, model, and any per-provider request parameters. */
+  /** Resolve model and any per-provider request parameters. */
   protected abstract getConfig(): TConfig;
 
-  /** Throw a provider-specific "API key not configured" error. */
-  protected abstract missingApiKeyError(): Error;
+  /** Validate provider-specific prerequisites such as API keys or CLI auth. */
+  protected abstract assertConfigured(config: TConfig): void;
 
   /** Issue the actual HTTP request and normalize its response. */
   protected abstract query(history: ConversationMessage[], config: TConfig): Promise<ProviderQueryResult>;
@@ -79,15 +79,27 @@ export abstract class OpenAICompatibleProvider<TConfig extends { apiKey: string;
   /** Hook for per-session setup that runs once config is resolved (e.g. endpointClass). */
   protected prepareSessionExtras(_session: ActiveSession, _config: TConfig): void {}
 
+  /** Optional per-request model routing hooks. */
+  protected configForInit(config: TConfig): TConfig {
+    return config;
+  }
+
+  protected configForObservation(
+    config: TConfig,
+    _message: { tool_name?: string },
+  ): TConfig {
+    return config;
+  }
+
   async startSession(session: ActiveSession, worker?: WorkerRef): Promise<void> {
-    const config = this.getConfig();
-    const { apiKey, model } = config;
+    const baseConfig = this.getConfig();
+    const config = session.modelOverride
+      ? { ...baseConfig, model: session.modelOverride }
+      : baseConfig;
+    const { model } = config;
     session.lastModelId = model;
     this.prepareSessionExtras(session, config);
-
-    if (!apiKey) {
-      throw this.missingApiKeyError();
-    }
+    this.assertConfigured(config);
 
     if (!session.memorySessionId) {
       const syntheticMemorySessionId = `${this.syntheticIdPrefix}-${session.contentSessionId}-${Date.now()}`;
@@ -107,8 +119,10 @@ export abstract class OpenAICompatibleProvider<TConfig extends { apiKey: string;
     try {
       session.lastPromptSentAt = Date.now();
       session.lastGeneratorSource = 'init';
-      const initResponse = await this.query(session.conversationHistory, config);
-      await this.handleInitResponse(initResponse, session, worker, model, initContext);
+      const initConfig = this.configForInit(config);
+      session.lastModelId = initConfig.model;
+      const initResponse = await this.query(session.conversationHistory, initConfig);
+      await this.handleInitResponse(initResponse, session, worker, initConfig.model, initContext);
     } catch (error: unknown) {
       if (error instanceof Error) {
         logger.error('SDK', `${this.providerName} init query failed`, { sessionId: session.sessionDbId, model }, error);
@@ -215,7 +229,9 @@ export abstract class OpenAICompatibleProvider<TConfig extends { apiKey: string;
     session.conversationHistory.push({ role: 'user', content: obsPrompt });
     session.lastPromptSentAt = Date.now();
     session.lastGeneratorSource = 'ingest';
-    const obsResponse = await this.query(session.conversationHistory, config);
+    const observationConfig = this.configForObservation(config, message);
+    session.lastModelId = observationConfig.model;
+    const obsResponse = await this.query(session.conversationHistory, observationConfig);
 
     let tokensUsed = 0;
     if (obsResponse.content) {
@@ -231,7 +247,7 @@ export abstract class OpenAICompatibleProvider<TConfig extends { apiKey: string;
     if (obsResponse.content || this.forwardEmptyMessageResponse) {
       await processAgentResponse(
         obsResponse.content || '', session, this.dbManager, this.sessionManager,
-        worker, tokensUsed, originalTimestamp, this.providerName, lastCwd, obsResponse.servedModel ?? config.model, responseContext
+        worker, tokensUsed, originalTimestamp, this.providerName, lastCwd, obsResponse.servedModel ?? observationConfig.model, responseContext
       );
     } else {
       logger.warn('SDK', `Empty ${this.providerName} observation response, leaving queue intact`, {
@@ -268,6 +284,7 @@ export abstract class OpenAICompatibleProvider<TConfig extends { apiKey: string;
     const settings = SettingsDefaultsManager.loadFromFile(USER_SETTINGS_PATH);
     const summaryModel = resolveSummaryTierModel(config.model, settings);
     const summaryConfig = summaryModel === config.model ? config : { ...config, model: summaryModel };
+    session.lastModelId = summaryConfig.model;
     if (summaryConfig !== config) {
       logger.debug('SESSION', 'Tier routing: summary model', {
         sessionId: session.sessionDbId, model: summaryModel

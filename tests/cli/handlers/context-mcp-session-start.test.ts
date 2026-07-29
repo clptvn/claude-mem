@@ -99,7 +99,6 @@ describe('contextHandler Codex SessionStart MCP path', () => {
       name: 'session_start_context',
       args: {
         projects: ['parent-project', 'repo-project'],
-        platformSource: 'codex',
       },
     }]);
     expect(workerCalls).toHaveLength(0);
@@ -121,7 +120,6 @@ describe('contextHandler Codex SessionStart MCP path', () => {
       name: 'session_start_context',
       args: {
         projects: ['parent-project', 'repo-project'],
-        platformSource: 'codex',
       },
     }]);
   });
@@ -139,7 +137,7 @@ describe('contextHandler Codex SessionStart MCP path', () => {
     expect(result.hookSpecificOutput?.additionalContext).toBe('context from worker');
     expect(mcpCalls).toHaveLength(1);
     expect(workerCalls).toEqual([{
-      path: '/api/context/inject?projects=parent-project%2Crepo-project&platformSource=codex',
+      path: '/api/context/inject?projects=parent-project%2Crepo-project',
       method: 'GET',
     }]);
   });
@@ -156,7 +154,7 @@ describe('contextHandler Codex SessionStart MCP path', () => {
     expect(result.hookSpecificOutput?.additionalContext).toBe('context from worker');
     expect(mcpCalls).toHaveLength(0);
     expect(workerCalls).toEqual([{
-      path: '/api/context/inject?projects=parent-project%2Crepo-project&platformSource=claude',
+      path: '/api/context/inject?projects=parent-project%2Crepo-project',
       method: 'GET',
     }]);
   });

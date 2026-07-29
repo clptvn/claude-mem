@@ -145,9 +145,8 @@ export function ContextSettingsModal({
   } = useContextPreview(formState);
 
   const updateSetting = useCallback((key: keyof Settings, value: string) => {
-    const newState = { ...formState, [key]: value };
-    setFormState(newState);
-  }, [formState]);
+    setFormState(current => ({ ...current, [key]: value }));
+  }, []);
 
   const handleSave = useCallback(() => {
     onSave(formState);
@@ -332,13 +331,14 @@ export function ContextSettingsModal({
             >
               <FormField
                 label="AI Provider"
-                tooltip="Choose between Claude (via Agent SDK) or Gemini (via REST API)"
+                tooltip="Choose the language model used to compress session activity into memories"
               >
                 <select
                   value={formState.CLAUDE_MEM_PROVIDER || 'claude'}
                   onChange={(e) => updateSetting('CLAUDE_MEM_PROVIDER', e.target.value)}
                 >
                   <option value="claude">Claude (uses your Claude account)</option>
+                  <option value="codex">Codex (uses your ChatGPT/Codex account)</option>
                   <option value="gemini">Gemini (uses API key)</option>
                   <option value="openrouter">OpenRouter (multi-model)</option>
                 </select>
@@ -358,6 +358,56 @@ export function ContextSettingsModal({
                     <option value="opus">opus (highest quality)</option>
                   </select>
                 </FormField>
+              )}
+
+              {formState.CLAUDE_MEM_PROVIDER === 'codex' && (
+                <>
+                  <FormField
+                    label="Complex Model"
+                    tooltip="Model used for complex observation batches"
+                  >
+                    <select
+                      value={formState.CLAUDE_MEM_TIER_SMART_MODEL || 'gpt-5.6-terra'}
+                      onChange={(e) => updateSetting('CLAUDE_MEM_TIER_SMART_MODEL', e.target.value)}
+                    >
+                      <option value="gpt-5.6-terra">gpt-5.6-terra</option>
+                      <option value="gpt-5.6-luna">gpt-5.6-luna</option>
+                      <option value="gpt-5.6-sol">gpt-5.6-sol</option>
+                    </select>
+                  </FormField>
+                  <FormField
+                    label="Routine / Summary Model"
+                    tooltip="Model used for simple reads and end-of-session summaries"
+                  >
+                    <select
+                      value={formState.CLAUDE_MEM_TIER_SIMPLE_MODEL || 'gpt-5.6-luna'}
+                      onChange={(e) => {
+                        updateSetting('CLAUDE_MEM_MODEL', e.target.value);
+                        updateSetting('CLAUDE_MEM_TIER_SIMPLE_MODEL', e.target.value);
+                        updateSetting('CLAUDE_MEM_TIER_SUMMARY_MODEL', e.target.value);
+                        updateSetting('CLAUDE_MEM_TIER_FAST_MODEL', e.target.value);
+                      }}
+                    >
+                      <option value="gpt-5.6-luna">gpt-5.6-luna</option>
+                      <option value="gpt-5.6-terra">gpt-5.6-terra</option>
+                      <option value="gpt-5.6-sol">gpt-5.6-sol</option>
+                    </select>
+                  </FormField>
+                  <FormField
+                    label="Reasoning Effort"
+                    tooltip="Low is the recommended baseline for structured memory extraction"
+                  >
+                    <select
+                      value={formState.CLAUDE_MEM_CODEX_REASONING_EFFORT || 'low'}
+                      onChange={(e) => updateSetting('CLAUDE_MEM_CODEX_REASONING_EFFORT', e.target.value)}
+                    >
+                      <option value="low">low</option>
+                      <option value="medium">medium</option>
+                      <option value="high">high</option>
+                      <option value="xhigh">xhigh</option>
+                    </select>
+                  </FormField>
+                </>
               )}
 
               {formState.CLAUDE_MEM_PROVIDER === 'gemini' && (

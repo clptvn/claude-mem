@@ -16,7 +16,6 @@ import { logger } from '../../utils/logger.js';
 import { loadFromFileOnce } from '../../shared/hook-settings.js';
 import { shouldTrackProject } from '../../shared/should-track-project.js';
 import { readStaleMarker } from '../../shared/oauth-token.js';
-import { normalizePlatformSource } from '../../shared/platform-source.js';
 import { callMcpToolOnce } from '../../shared/mcp-client.js';
 
 async function requestSessionStartContext(args: {
@@ -80,13 +79,11 @@ export const contextHandler: EventHandler = {
       && input.platform !== 'codex';
 
     const projectsParam = context.allProjects.join(',');
-    const normalizedPlatformSource = input.platform
-      ? normalizePlatformSource(input.platform)
-      : undefined;
-    const platformSourceParam = input.platform
-      ? `&platformSource=${encodeURIComponent(normalizedPlatformSource!)}`
-      : '';
-    const apiPath = `/api/context/inject?projects=${encodeURIComponent(projectsParam)}${platformSourceParam}`;
+    // Automatic context is project-scoped, not client-scoped: Claude, Codex,
+    // and other adapters in the same repository share one memory corpus.
+    // platformSource remains stored on each row and is still available as an
+    // explicit MCP/search filter for users who ask for it.
+    const apiPath = `/api/context/inject?projects=${encodeURIComponent(projectsParam)}`;
     const colorApiPath = input.platform === 'claude-code' ? `${apiPath}&colors=true` : apiPath;
 
     const emptyResult: HookResult = {
@@ -98,7 +95,6 @@ export const contextHandler: EventHandler = {
     const mcpContextResult = input.platform === 'codex'
       ? await fetchSessionStartContextViaMcp({
           projects: context.allProjects,
-          ...(normalizedPlatformSource ? { platformSource: normalizedPlatformSource } : {}),
         })
       : null;
 
@@ -136,7 +132,6 @@ export const contextHandler: EventHandler = {
       const mcpColorResult = input.platform === 'codex'
         ? await fetchSessionStartContextViaMcp({
             projects: context.allProjects,
-            ...(normalizedPlatformSource ? { platformSource: normalizedPlatformSource } : {}),
             colors: true,
           })
         : null;

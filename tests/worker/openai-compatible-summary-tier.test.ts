@@ -50,8 +50,8 @@ class TestProvider extends OpenAICompatibleProvider<{ apiKey: string; model: str
     return { apiKey: 'test-api-key', model: 'session-model' };
   }
 
-  protected missingApiKeyError(): Error {
-    return new Error('missing key');
+  protected assertConfigured(config: { apiKey: string; model: string }): void {
+    if (!config.apiKey) throw new Error('missing key');
   }
 
   protected async query(_history: ConversationMessage[], config: { apiKey: string; model: string }): Promise<ProviderQueryResult> {
@@ -120,5 +120,21 @@ describe('OpenAICompatibleProvider summary tier routing', () => {
     await provider.startSession(makeSession());
 
     expect(provider.queriedModels).toEqual(['session-model', 'session-model']);
+  });
+
+  it('uses the session model override for the simple-tier generator', async () => {
+    loadFromFileSpy = spyOn(SettingsDefaultsManager, 'loadFromFile').mockImplementation(() => ({
+      ...SettingsDefaultsManager.getAllDefaults(),
+      CLAUDE_MEM_TIER_ROUTING_ENABLED: 'true',
+      CLAUDE_MEM_TIER_SUMMARY_MODEL: '',
+    }));
+
+    const provider = new TestProvider({} as any, {
+      getMessageIterator: async function* () {},
+    } as any);
+
+    await provider.startSession(makeSession({ modelOverride: 'gpt-5.6-luna' }));
+
+    expect(provider.queriedModels).toEqual(['gpt-5.6-luna']);
   });
 });

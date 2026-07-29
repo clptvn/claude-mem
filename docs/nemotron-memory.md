@@ -5,7 +5,10 @@
 Claude Code and Codex use the same resident embedding model, queue, and vector
 database. Starting five chats does not load five copies of the model. The
 existing Claude-Mem hooks still capture tool activity, generate structured
-observations and session summaries, and inject relevant memories. Only the
+observations and session summaries, and inject relevant memories. Memories are
+project-scoped rather than client-scoped: Claude and Codex sessions in the same
+Git checkout read the same corpus, while `platform_source` remains attached as
+provenance and can still be used as an explicit search filter. Only the
 embedding and vector-search layer is replaced.
 
 The generation model and embedding model have distinct jobs:
@@ -84,8 +87,8 @@ hosts:
 bun install
 npm run build
 npm run nemotron:install
-node dist/npx-cli/index.js install --ide claude-code --provider claude --runtime worker --no-auto-start --disable-auto-memory
-node dist/npx-cli/index.js install --ide codex-cli --provider claude --runtime worker --no-auto-start --disable-auto-memory
+node dist/npx-cli/index.js install --ide claude-code --provider codex --runtime worker --no-auto-start --disable-auto-memory
+node dist/npx-cli/index.js install --ide codex-cli --provider codex --runtime worker --no-auto-start --disable-auto-memory
 bun plugin/scripts/worker-service.cjs start
 ```
 
@@ -142,6 +145,12 @@ Claude-Mem settings live in `~/.claude-mem/settings.json`:
 | `CLAUDE_MEM_NEMOTRON_AUTO_START` | `true` |
 | `CLAUDE_MEM_NEMOTRON_REQUEST_TIMEOUT_MS` | `180000` |
 | `CLAUDE_MEM_SEMANTIC_INJECT` | `true` |
+| `CLAUDE_MEM_PROVIDER` | `codex` |
+| `CLAUDE_MEM_MODEL` | `gpt-5.6-luna` |
+| `CLAUDE_MEM_TIER_SIMPLE_MODEL` | `gpt-5.6-luna` |
+| `CLAUDE_MEM_TIER_SUMMARY_MODEL` | `gpt-5.6-luna` |
+| `CLAUDE_MEM_TIER_FAST_MODEL` | `gpt-5.6-luna` |
+| `CLAUDE_MEM_TIER_SMART_MODEL` | `gpt-5.6-terra` |
 
 Set `CLAUDE_MEM_EMBEDDING_PROVIDER=chroma` to restore the upstream
 `chroma-mcp` MiniLM path.
@@ -153,10 +162,13 @@ web viewer remain local. Cloud sync is off unless its URL and credentials are
 explicitly configured. Claude-Mem analytics and Chroma product telemetry are
 disabled by the installer.
 
-The configured Claude provider still receives session activity to generate
-compact observations and summaries. Hugging Face remains reachable so the
-Nemotron checkpoint can be downloaded and its cache checked; package managers
-and GitHub are contacted only when installing or updating dependencies/source.
+The configured Codex provider sends session activity to OpenAI through your
+logged-in Codex CLI to generate compact observations and summaries. Its
+subprocesses are ephemeral, read-only, receive prompts through stdin, ignore
+repo/user Codex configuration and rules, and have web search disabled. Hugging
+Face remains reachable so the Nemotron checkpoint can be downloaded and its
+cache checked; package managers and GitHub are contacted only when installing
+or updating dependencies/source.
 
 ## Mac resource profile
 

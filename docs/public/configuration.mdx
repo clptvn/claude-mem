@@ -13,8 +13,8 @@ Settings are managed in `~/.claude-mem/settings.json`. The file is auto-created 
 
 | Setting                       | Default                         | Description                           |
 |-------------------------------|---------------------------------|---------------------------------------|
-| `CLAUDE_MEM_MODEL`            | `claude-haiku-4-5-20251001`     | Claude model used to compress observations (when using the Claude provider) |
-| `CLAUDE_MEM_PROVIDER`         | `claude`                        | AI provider: `claude`, `gemini`, or `openrouter` |
+| `CLAUDE_MEM_MODEL`            | `claude-haiku-4-5-20251001`     | Primary compression model for the Claude or Codex provider |
+| `CLAUDE_MEM_PROVIDER`         | `claude`                        | AI provider: `claude`, `codex`, `gemini`, or `openrouter` |
 | `CLAUDE_MEM_CLAUDE_AUTH_METHOD` | `subscription`                | Claude provider auth mode: `subscription`, `api-key`, or `gateway` |
 | `CLAUDE_MEM_MODE`             | `code`                          | Active mode profile (e.g., `code--es`, `email-investigation`) |
 | `CLAUDE_MEM_CONTEXT_OBSERVATIONS` | `50`                        | Number of observations to inject      |
@@ -43,6 +43,18 @@ See [Gemini Provider](usage/gemini-provider) for detailed configuration and free
 
 See [OpenRouter Provider](usage/openrouter-provider) for detailed configuration, free model list, and usage guide.
 
+### Codex Provider Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `CLAUDE_MEM_CODEX_PATH` | _(auto-detect)_ | Optional path to the Codex CLI |
+| `CLAUDE_MEM_CODEX_REASONING_EFFORT` | `low` | Codex reasoning effort for memory extraction |
+| `CLAUDE_MEM_CODEX_TIMEOUT_MS` | `180000` | Maximum time for one non-interactive Codex request |
+
+The installer configures `gpt-5.6-luna` for routine observations and session
+summaries, and `gpt-5.6-terra` for complex observation batches. See
+[Codex Provider](usage/codex-provider).
+
 ### Claude Gateway Settings
 
 Gateway credentials live in `~/.claude-mem/.env`, not `settings.json`.
@@ -63,6 +75,7 @@ Use [LiteLLM Gateway](configuration/litellm-gateway) when you want `CLAUDE_MEM_P
 | `CLAUDE_MEM_LOG_LEVEL`        | `INFO`                          | Log verbosity (DEBUG, INFO, WARN, ERROR, SILENT) |
 | `CLAUDE_MEM_PYTHON_VERSION`   | `3.13`                          | Python version for chroma-mcp         |
 | `CLAUDE_CODE_PATH`            | _(auto-detect)_                 | Path to Claude Code CLI (for Windows) |
+| `CLAUDE_MEM_CODEX_PATH`       | _(auto-detect)_                 | Path to Codex CLI |
 
 ## Model Configuration
 

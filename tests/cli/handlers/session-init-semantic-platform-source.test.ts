@@ -81,8 +81,8 @@ afterAll(() => {
   mock.module('../../../src/shared/worker-utils.js', () => realWorkerUtilsSnapshot);
 });
 
-describe('sessionInitHandler semantic injection platform source', () => {
-  it('includes normalized platformSource in semantic context request payload', async () => {
+describe('sessionInitHandler shared semantic injection', () => {
+  it('does not client-scope semantic context in the same project', async () => {
     const env = { ...process.env };
     delete env.CLAUDE_MEM_INTERNAL;
     const prompt = 'Please restore the platform-specific context for semantic injection.';
@@ -117,7 +117,7 @@ describe('sessionInitHandler semantic injection platform source', () => {
       if (!semanticCall) throw new Error('semantic call missing: ' + JSON.stringify(workerCallLog));
       if (semanticCall.method !== 'POST') throw new Error('semantic method mismatch: ' + semanticCall.method);
       const body = semanticCall.body;
-      if (body.q !== ${JSON.stringify(prompt)} || body.limit !== '7' || body.platformSource !== 'codex') {
+      if (body.q !== ${JSON.stringify(prompt)} || body.limit !== '7' || 'platformSource' in body) {
         throw new Error('semantic body mismatch: ' + JSON.stringify(body));
       }
     `;

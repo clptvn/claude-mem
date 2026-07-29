@@ -151,7 +151,7 @@ export const sessionInitHandler: EventHandler = {
       const semanticResult = await dependencies.executeWithWorkerFallback<SemanticContextResponse>(
         '/api/context/semantic',
         'POST',
-        { q: prompt, project, limit, platformSource },
+        { q: prompt, project, limit },
       );
       if (!dependencies.isWorkerFallback(semanticResult) && semanticResult?.context) {
         logger.debug('HOOK', `Semantic injection: ${semanticResult.count} observations for prompt`, { sessionId: sessionDbId, count: semanticResult.count });

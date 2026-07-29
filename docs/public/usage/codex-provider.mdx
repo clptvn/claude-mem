@@ -1,0 +1,75 @@
+---
+title: "Codex Provider"
+description: "Use GPT-5.6 models through your logged-in Codex CLI for memory compression"
+---
+
+# Codex Provider
+
+Claude-Mem can use the local Codex CLI as its language-model provider. This
+reuses the account shown by `codex login status`; it does not require an OpenAI
+API key in Claude-Mem.
+
+## Recommended tier mapping
+
+The installer preserves Claude-Mem's complexity routing:
+
+| Work | Model |
+|------|-------|
+| Simple read/list/search observations | `gpt-5.6-luna` |
+| Session summaries | `gpt-5.6-luna` |
+| Fast tier alias | `gpt-5.6-luna` |
+| Complex/default observations | `gpt-5.6-terra` |
+| Smart tier alias | `gpt-5.6-terra` |
+
+Install non-interactively:
+
+```bash
+npx claude-mem install --provider codex
+```
+
+Or configure `~/.claude-mem/settings.json`:
+
+```json
+{
+  "CLAUDE_MEM_PROVIDER": "codex",
+  "CLAUDE_MEM_MODEL": "gpt-5.6-luna",
+  "CLAUDE_MEM_TIER_ROUTING_ENABLED": "true",
+  "CLAUDE_MEM_TIER_SIMPLE_MODEL": "gpt-5.6-luna",
+  "CLAUDE_MEM_TIER_SUMMARY_MODEL": "gpt-5.6-luna",
+  "CLAUDE_MEM_TIER_FAST_MODEL": "gpt-5.6-luna",
+  "CLAUDE_MEM_TIER_SMART_MODEL": "gpt-5.6-terra",
+  "CLAUDE_MEM_CODEX_REASONING_EFFORT": "low"
+}
+```
+
+## Runtime behavior
+
+Each request uses `codex exec` in non-interactive mode. The process:
+
+- reads the rendered memory transcript from stdin, so session content is not
+  exposed in process arguments;
+- is ephemeral and does not persist a Codex rollout;
+- ignores the user's Codex config and repository rules;
+- runs in a read-only sandbox with web search disabled;
+- is instructed to perform a text-only transformation and return only the
+  Claude-Mem XML protocol.
+
+If Codex is missing, signed out, rate-limited, or the selected model is
+unavailable, Claude-Mem surfaces that provider failure. It does not silently
+send the same content to Claude, Gemini, or OpenRouter.
+
+## Shared Claude and Codex memories
+
+Storage and automatic retrieval are scoped by the Git project identity, not by
+the client that created a row. Claude Code and Codex sessions opened anywhere
+inside the same checkout therefore share observations, summaries, prompt
+memories, and Nemotron retrieval results. The source client is retained in
+`platform_source` for provenance and optional explicit filtering.
+
+## Data boundary
+
+The SQLite memory database, Nemotron embeddings, vector index, queue, logs, and
+viewer remain local. The rendered session activity for each compression request
+is sent to OpenAI through the authenticated Codex CLI. Claude-Mem does not
+enable cloud sync, and the Nemotron installer disables Claude-Mem and Chroma
+product telemetry.

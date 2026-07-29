@@ -354,7 +354,10 @@ export class TranscriptEventProcessor {
     const context = getProjectContext(cwd);
     const projectsParam = context.allProjects.join(',');
 
-    const contextUrl = `/api/context/inject?projects=${encodeURIComponent(projectsParam)}&platformSource=${encodeURIComponent(session.platformSource)}`;
+    // Context is shared across clients in the same project. Keep
+    // platformSource as provenance on stored rows, but do not use it as an
+    // automatic retrieval boundary.
+    const contextUrl = `/api/context/inject?projects=${encodeURIComponent(projectsParam)}`;
     const agentsPath = expandHomePath(watch.context.path ?? `${cwd}/AGENTS.md`);
 
     const resolvedAgentsPath = path.resolve(agentsPath);

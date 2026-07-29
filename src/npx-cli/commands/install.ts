@@ -807,7 +807,7 @@ function mergeSettings(updates: Record<string, string>): boolean {
   }
 }
 
-type ProviderId = 'claude' | 'gemini' | 'openrouter';
+type ProviderId = 'claude' | 'gemini' | 'openrouter' | 'codex';
 type ClaudeAccessMode = 'subscription' | 'api-key';
 type ClaudeApiMode = 'direct' | 'gateway';
 // Phase 1d: Persisted DB literals (`server_beta_schema_migrations`, job_type
@@ -963,6 +963,27 @@ async function promptProvider(options: InstallOptions): Promise<ProviderId> {
     if (wrote) log.info('Saved Claude Agent SDK configuration to ~/.claude-mem/settings.json');
   };
 
+  const persistCodexProvider = () => {
+    const requestedModel = options.model?.trim();
+    const routineModel = requestedModel || 'gpt-5.6-luna';
+    const smartModel = requestedModel || 'gpt-5.6-terra';
+    const wrote = mergeSettings({
+      CLAUDE_MEM_PROVIDER: 'codex',
+      CLAUDE_MEM_MODEL: routineModel,
+      CLAUDE_MEM_TIER_ROUTING_ENABLED: 'true',
+      CLAUDE_MEM_TIER_SIMPLE_MODEL: routineModel,
+      CLAUDE_MEM_TIER_SUMMARY_MODEL: routineModel,
+      CLAUDE_MEM_TIER_FAST_MODEL: routineModel,
+      CLAUDE_MEM_TIER_SMART_MODEL: smartModel,
+      CLAUDE_MEM_CODEX_REASONING_EFFORT: 'low',
+    });
+    if (wrote) {
+      log.info(
+        `Saved Codex CLI provider (routine/summary=${routineModel}, complex=${smartModel}) to ~/.claude-mem/settings.json`,
+      );
+    }
+  };
+
   const useSubscriptionAuth = () => {
     persistClaudeProvider('subscription');
     saveClaudeMemEnv({
@@ -1072,6 +1093,10 @@ async function promptProvider(options: InstallOptions): Promise<ProviderId> {
         persistClaudeProvider();
         return 'claude';
       }
+      if (options.provider === 'codex') {
+        persistCodexProvider();
+        return 'codex';
+      }
       const wrote = mergeSettings({ CLAUDE_MEM_PROVIDER: options.provider });
       if (wrote) log.info(`Saved provider=${options.provider} to ~/.claude-mem/settings.json`);
       log.warn(`Provider=${options.provider} requested non-interactively. API key prompt skipped — set CLAUDE_MEM_${options.provider.toUpperCase()}_API_KEY and CLAUDE_MEM_PROVIDER in settings.json or env manually if not already set.`);
@@ -1132,6 +1157,7 @@ async function promptProvider(options: InstallOptions): Promise<ProviderId> {
       message: 'Which memory provider do you want to use?',
       options: [
         { value: 'claude', label: 'Claude Agent SDK (recommended)' },
+        { value: 'codex', label: 'Codex CLI (uses your logged-in ChatGPT/Codex account)' },
         { value: 'gemini', label: 'Gemini' },
         { value: 'openrouter', label: 'OpenRouter' },
       ],
@@ -1147,6 +1173,11 @@ async function promptProvider(options: InstallOptions): Promise<ProviderId> {
   if (selectedProvider === 'claude') {
     await runClaudeAuthFlow();
     return 'claude';
+  }
+
+  if (selectedProvider === 'codex') {
+    persistCodexProvider();
+    return 'codex';
   }
 
   const providerLabel = selectedProvider === 'gemini' ? 'Gemini' : 'OpenRouter';
@@ -1434,7 +1465,7 @@ async function promptCmemOnlineOptIn(version: string): Promise<void> {
 
 export interface InstallOptions {
   ide?: string;
-  provider?: 'claude' | 'gemini' | 'openrouter';
+  provider?: 'claude' | 'gemini' | 'openrouter' | 'codex';
   model?: string;
   noAutoStart?: boolean;
   disableAutoMemory?: boolean;
