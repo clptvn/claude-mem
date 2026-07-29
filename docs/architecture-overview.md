@@ -19,11 +19,17 @@
 |  +-- SDKAgent (Claude Agent SDK)                          |
 |  +-- SearchManager (search orchestration)                 |
 |  +-- ProcessRegistry (subprocess management)              |
-|  +-- ChromaSync (embedding synchronization)               |
+|  +-- ChromaSync (vector synchronization contract)         |
++-----------------------------------------------------------+
+|  Shared Nemotron Service (LaunchAgent, localhost:37901)    |
+|  +-- one Nemotron-3-Embed-1B model on MPS                 |
+|  +-- cross-client embedding batcher                       |
+|  +-- durable SQLite write queue                           |
+|  +-- Chroma persistent vector store                       |
 +-----------------------------------------------------------+
 |  Storage Layer                                            |
 |  +-- SQLite (claude-mem.db) -- structured data            |
-|  +-- ChromaDB (chroma.sqlite3) -- vector embeddings       |
+|  +-- ChromaDB -- explicit 2048d Nemotron embeddings       |
 |  +-- MCP Server (interface for Claude Code)               |
 +-----------------------------------------------------------+
 ```
@@ -55,7 +61,10 @@ Tool use -> observation -> /api/sessions/observations
   |                    Claude Agent SDK -> ResponseProcessor
   |                              |
   |                    +-- storeObservations() -> SQLite
-  |                    +-- chromaSync.sync() -> ChromaDB
+  |                    +-- chromaSync.sync() -> durable write queue
+  |                                             |
+  |                                             v
+  |                                  shared Nemotron -> ChromaDB
   |                    +-- broadcastObservation() -> SSE/UI
   |
 Stop -> summarize -> /api/sessions/summarize
@@ -124,7 +133,7 @@ The conversion between them is handled by SessionStore and is critical for FK co
 | pending_messages | session_db_id, message_type | Per-session pending queue |
 | observation_feedback | observation_id, signal_type | Usage tracking |
 
-### ChromaDB (chroma.sqlite3)
+### Nemotron-backed ChromaDB
 
 Vector embeddings for semantic search. Each observation generates multiple documents:
 
@@ -135,7 +144,13 @@ obs_{id}_fact_1     -> second fact
 ...
 ```
 
-Accessed via chroma-mcp (MCP process), communication over stdio.
+On Apple Silicon, the worker preserves the existing Chroma tool contract but
+routes it over localhost HTTP to the user-level Nemotron service. Documents
+use `encode_document` and searches use `encode_query`, preserving NVIDIA's
+retrieval prefixes and normalized cosine geometry. Vector writes are persisted
+to `~/.claude-mem/nemotron/jobs.sqlite3` before inference and recovered after a
+process or machine restart. Other platforms retain the upstream `chroma-mcp`
+stdio path.
 
 ## Process Management
 

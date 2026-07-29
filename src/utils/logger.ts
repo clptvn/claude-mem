@@ -33,6 +33,7 @@ export type Component =
   | 'HTTP'
   | 'IMPORT'
   | 'INGEST'
+  | 'NEMOTRON'
   | 'OAUTH'
   | 'OPENCLAW'
   | 'OPENCODE'

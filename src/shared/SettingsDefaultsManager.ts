@@ -64,6 +64,10 @@ export interface SettingsDefaults {
   CLAUDE_MEM_CHROMA_TENANT: string;
   CLAUDE_MEM_CHROMA_DATABASE: string;
   CLAUDE_MEM_CHROMA_PREWARM_TIMEOUT_MS: string;
+  CLAUDE_MEM_EMBEDDING_PROVIDER: string;
+  CLAUDE_MEM_NEMOTRON_URL: string;
+  CLAUDE_MEM_NEMOTRON_AUTO_START: string;
+  CLAUDE_MEM_NEMOTRON_REQUEST_TIMEOUT_MS: string;
   // Worker-native cloud sync. Active ⇔ TOKEN, USER_ID, and HUB_URL are all
   // non-empty — there is no separate enabled flag. HUB_URL points at the
   // two-lane sync hub (workers/sync-hub); while it is empty, sync is OFF
@@ -142,7 +146,7 @@ export class SettingsDefaultsManager {
     CLAUDE_MEM_EXCLUDED_PROJECTS: '',  // Comma-separated glob patterns for excluded project paths
     CLAUDE_MEM_FOLDER_MD_EXCLUDE: '[]',  // JSON array of folder paths to exclude from CLAUDE.md generation
     CLAUDE_MEM_FOLDER_MD_SKELETON_DENYLIST: '[]',  // #2400 — JSON array of glob patterns; when a folder matches AND its generated CLAUDE.md would be empty/skeleton, skip injection (avoids polluting non-content dirs with empty skeletons). Default [] preserves existing behavior.
-    CLAUDE_MEM_SEMANTIC_INJECT: 'false',             // Inject relevant past observations on every UserPromptSubmit (experimental, disabled by default)
+    CLAUDE_MEM_SEMANTIC_INJECT: 'false',             // Enabled by the Nemotron installer after the shared service is ready
     CLAUDE_MEM_SEMANTIC_INJECT_LIMIT: '5',           // Top-N most relevant observations to inject per prompt
     CLAUDE_MEM_TIER_ROUTING_ENABLED: 'true',         // Route observations to models by complexity
     CLAUDE_MEM_TIER_SIMPLE_MODEL: 'haiku', // Portable tier alias — works across Direct API, Bedrock, Vertex, Azure (see #1463)
@@ -158,6 +162,13 @@ export class SettingsDefaultsManager {
     CLAUDE_MEM_CHROMA_TENANT: 'default_tenant',
     CLAUDE_MEM_CHROMA_DATABASE: 'default_database',
     CLAUDE_MEM_CHROMA_PREWARM_TIMEOUT_MS: '120000',
+    // The dedicated installer switches this to nemotron only after the
+    // user-level service is healthy, so a plain upstream-style install never
+    // points at a service that does not exist.
+    CLAUDE_MEM_EMBEDDING_PROVIDER: 'chroma',
+    CLAUDE_MEM_NEMOTRON_URL: 'http://127.0.0.1:37901',
+    CLAUDE_MEM_NEMOTRON_AUTO_START: 'true',
+    CLAUDE_MEM_NEMOTRON_REQUEST_TIMEOUT_MS: '180000',
     // Worker-native cloud sync: credentials come from cmem.ai → Connect.
     CLAUDE_MEM_CLOUD_SYNC_TOKEN: '',
     CLAUDE_MEM_CLOUD_SYNC_USER_ID: '',

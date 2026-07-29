@@ -15,6 +15,7 @@ import { getSupervisor } from '../../supervisor/index.js';
 import { captureProcessStartToken, isPidAlive } from '../../supervisor/process-registry.js';
 import { clearDependencyStatus, recordChromaVectorSearchUnavailable, recordUvxVectorSearchUnavailable } from '../../shared/dependency-health.js';
 import { ChromaUnavailableError } from '../worker/search/errors.js';
+import { NemotronServiceClient } from './NemotronServiceClient.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -688,6 +689,10 @@ export class ChromaMcpManager {
   }
 
   async callTool(toolName: string, toolArguments: Record<string, unknown>): Promise<unknown> {
+    if (NemotronServiceClient.isEnabled()) {
+      return await NemotronServiceClient.getInstance().callTool(toolName, toolArguments);
+    }
+
     await this.ensureConnected();
 
     logger.debug('CHROMA_MCP', `Calling tool: ${toolName}`, {
@@ -752,6 +757,10 @@ export class ChromaMcpManager {
   }
 
   async isHealthy(): Promise<boolean> {
+    if (NemotronServiceClient.isEnabled()) {
+      return await NemotronServiceClient.getInstance().isHealthy();
+    }
+
     try {
       await this.callTool('chroma_list_collections', { limit: 1 });
       return true;

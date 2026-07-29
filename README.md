@@ -160,6 +160,34 @@ Restart Claude Code. Context from previous sessions will automatically appear in
 
 > **Note:** Claude-Mem is also published on npm, but `npm install -g claude-mem` installs the **SDK/library only** — it does not register the plugin hooks or set up the worker service. Always install via `npx claude-mem install` or the `/plugin` commands above.
 
+### Shared Nemotron embeddings on Apple Silicon
+
+This fork replaces Chroma's default MiniLM embedder with one user-level
+`nvidia/Nemotron-3-Embed-1B-BF16` service shared by Claude Code, Codex, and
+concurrent sessions:
+
+```bash
+npm run nemotron:install
+npm run nemotron:smoke
+```
+
+The installer creates the `ai.claude-mem.nemotron` macOS LaunchAgent. It loads
+one FP16 model through PyTorch MPS, batches requests from all local clients,
+durably queues vector writes in SQLite, and stores explicit query/passage
+embeddings in Chroma. The normal SQLite/FTS5 path remains available if the
+service is starting or unavailable.
+
+Useful lifecycle commands:
+
+```bash
+npm run nemotron:status
+npm run nemotron:stop
+npm run nemotron:start
+```
+
+See [Shared Nemotron Memory](docs/nemotron-memory.md) for architecture,
+configuration, resource usage, and recovery behavior.
+
 ### 🦞 OpenClaw Gateway
 
 Install claude-mem as a persistent memory plugin on [OpenClaw](https://openclaw.ai) gateways with a single command:
@@ -228,7 +256,7 @@ The installer handles dependencies, plugin setup, AI provider configuration, wor
 3. **Worker Service** - Local HTTP API with web viewer UI and search endpoints, managed by Bun
 4. **SQLite Database** - Stores sessions, observations, summaries
 5. **mem-search Skill** - Natural language queries with progressive disclosure
-6. **Chroma Vector Database** - Hybrid semantic + keyword search for intelligent context retrieval
+6. **Shared Nemotron + Chroma Service** - Batched query/passage embeddings plus durable vector writes on Apple Silicon; upstream Chroma embeddings remain the fallback elsewhere
 
 See [Architecture Overview](https://docs.claude-mem.ai/architecture/overview) for details.
 

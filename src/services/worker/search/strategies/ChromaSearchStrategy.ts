@@ -195,8 +195,6 @@ export class ChromaSearchStrategy {
           ? dateRange.end
           : new Date(dateRange.end).getTime();
       }
-    } else {
-      startEpoch = Date.now() - SEARCH_CONSTANTS.RECENCY_WINDOW_MS;
     }
 
     const metadataByIdMap = new Map<number, ChromaMetadata>();

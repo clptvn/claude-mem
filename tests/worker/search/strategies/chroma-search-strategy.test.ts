@@ -311,7 +311,7 @@ describe('ChromaSearchStrategy', () => {
       expect(result.usedChroma).toBe(true); 
     });
 
-    it('should filter out old results (beyond 90-day window)', async () => {
+    it('should retain relevant long-term results beyond 90 days', async () => {
       const oldEpoch = Date.now() - 1000 * 60 * 60 * 24 * 100; 
 
       mockChromaSync.queryChroma = mock(() => Promise.resolve({
@@ -328,7 +328,11 @@ describe('ChromaSearchStrategy', () => {
 
       const result = await strategy.search(options);
 
-      expect(mockSessionStore.getObservationsByIds).not.toHaveBeenCalled();
+      expect(mockSessionStore.getObservationsByIds).toHaveBeenCalledWith(
+        [1],
+        expect.objectContaining({ limit: 20 }),
+      );
+      expect(result.results.observations).toEqual([mockObservation]);
     });
 
     it('should propagate Chroma errors (fail-fast, no silent fallback)', async () => {

@@ -95,10 +95,9 @@ export class SearchManager {
   }
 
   /**
-   * Shared "Chroma semantic match -> 90-day recency filter -> SQLite hydrate"
-   * pipeline for the single-doc-type hybrid searches. Returns the hydrated rows
-   * (empty when Chroma yields nothing recent); callers own their own FTS
-   * fallback and formatting so per-caller behavior is preserved exactly.
+   * Shared semantic match -> SQLite hydrate pipeline for single-doc-type
+   * searches. Long-term memory must not silently expire after 90 days; callers
+   * can still supply an explicit date range when recency is part of the query.
    */
   private async hybridSemanticHydrate<T>(
     query: string,
@@ -112,19 +111,42 @@ export class SearchManager {
     logger.debug('SEARCH', 'Chroma returned semantic matches', { matchCount: chromaResults?.ids?.length ?? 0 });
 
     if (chromaResults?.ids && chromaResults.ids.length > 0) {
-      const ninetyDaysAgo = Date.now() - SEARCH_CONSTANTS.RECENCY_WINDOW_MS;
-      const recentIds = chromaResults.ids.filter((_id, idx) => {
-        const meta = chromaResults.metadatas[idx];
-        return meta && meta.created_at_epoch > ninetyDaysAgo;
-      });
-
-      logger.debug('SEARCH', 'Results within 90-day window', { count: recentIds.length });
-
-      if (recentIds.length > 0) {
-        return hydrate(recentIds);
-      }
+      return hydrate(chromaResults.ids);
     }
     return [];
+  }
+
+  /**
+   * Reciprocal-rank fusion keeps semantic paraphrase matches while allowing
+   * exact identifiers, file names, and error strings from FTS5 to surface.
+   * A small recency signal breaks close ties without deleting older facts.
+   */
+  private fuseRankedRows<T extends { id: number; created_at_epoch: number }>(
+    semantic: T[],
+    lexical: T[],
+    limit: number,
+  ): T[] {
+    const byId = new Map<number, T>();
+    const scores = new Map<number, number>();
+    const add = (rows: T[], weight: number) => {
+      rows.forEach((row, index) => {
+        byId.set(row.id, row);
+        scores.set(row.id, (scores.get(row.id) ?? 0) + weight / (60 + index + 1));
+      });
+    };
+    add(semantic, 1);
+    add(lexical, 0.7);
+
+    const now = Date.now();
+    for (const [id, row] of byId) {
+      const ageDays = Math.max(0, now - row.created_at_epoch) / (24 * 60 * 60 * 1000);
+      const softRecency = Math.exp(-ageDays / 365) * 0.002;
+      scores.set(id, (scores.get(id) ?? 0) + softRecency);
+    }
+
+    return [...byId.values()]
+      .sort((a, b) => (scores.get(b.id) ?? 0) - (scores.get(a.id) ?? 0))
+      .slice(0, limit);
   }
 
   private async searchChromaForTimeline(query: string, project?: string, platformSource?: string): Promise<ObservationSearchResult[]> {
@@ -396,8 +418,6 @@ export class SearchManager {
             ? dateRange.end
             : new Date(dateRange.end).getTime();
         }
-      } else {
-        startEpoch = Date.now() - SEARCH_CONSTANTS.RECENCY_WINDOW_MS;
       }
 
       const recentMetadata = chromaResults.metadatas.map((meta, idx) => ({
@@ -408,7 +428,7 @@ export class SearchManager {
           && (!endEpoch || meta.created_at_epoch <= endEpoch)
       })).filter(item => item.isRecent);
 
-      logger.debug('SEARCH', dateRange ? 'Results within user date range' : 'Results within 90-day window', { count: recentMetadata.length });
+      logger.debug('SEARCH', dateRange ? 'Results within user date range' : 'Semantic results across full memory history', { count: recentMetadata.length });
 
       const obsIds: number[] = [];
       const sessionIds: number[] = [];
@@ -444,6 +464,53 @@ export class SearchManager {
           limit: options.limit,
           project: options.project,
           platformSource: options.platformSource
+        });
+      }
+
+      const candidateLimit = Math.max(options.limit ?? SEARCH_CONSTANTS.DEFAULT_LIMIT, 20) * 3;
+      try {
+        if (searchObservations) {
+          const lexical = this.sessionSearch.searchObservations(query, {
+            ...options,
+            type: obs_type,
+            concepts,
+            files,
+            orderBy: 'relevance',
+            limit: candidateLimit,
+          });
+          observations = this.fuseRankedRows(
+            observations,
+            lexical,
+            options.limit ?? SEARCH_CONSTANTS.DEFAULT_LIMIT,
+          );
+        }
+        if (searchSessions) {
+          const lexical = this.sessionSearch.searchSessions(query, {
+            ...options,
+            orderBy: 'relevance',
+            limit: candidateLimit,
+          });
+          sessions = this.fuseRankedRows(
+            sessions,
+            lexical,
+            options.limit ?? SEARCH_CONSTANTS.DEFAULT_LIMIT,
+          );
+        }
+        if (searchPrompts) {
+          const lexical = this.sessionSearch.searchUserPrompts(query, {
+            ...options,
+            orderBy: 'relevance',
+            limit: candidateLimit,
+          });
+          prompts = this.fuseRankedRows(
+            prompts,
+            lexical,
+            options.limit ?? SEARCH_CONSTANTS.DEFAULT_LIMIT,
+          );
+        }
+      } catch (ftsError) {
+        logger.debug('SEARCH', 'FTS5 fusion unavailable; keeping semantic ranking', {
+          error: ftsError instanceof Error ? ftsError.message : String(ftsError),
         });
       }
     } else {

@@ -48,7 +48,9 @@
     "plugin/sqlite",
     "plugin/skills",
     "plugin/ui",
-    "openclaw"
+    "openclaw",
+    "scripts/nemotron-service.mjs",
+    "services/nemotron"
   ],
   "engines": {
     "node": ">=20.12.0",
@@ -70,6 +72,12 @@
     "worker:stop": "bun plugin/scripts/worker-service.cjs stop",
     "worker:restart": "bun plugin/scripts/worker-service.cjs restart",
     "worker:status": "bun plugin/scripts/worker-service.cjs status",
+    "nemotron:install": "node scripts/nemotron-service.mjs install",
+    "nemotron:status": "node scripts/nemotron-service.mjs status",
+    "nemotron:start": "node scripts/nemotron-service.mjs start",
+    "nemotron:stop": "node scripts/nemotron-service.mjs stop",
+    "nemotron:uninstall": "node scripts/nemotron-service.mjs uninstall",
+    "nemotron:smoke": "node scripts/nemotron-service.mjs smoke",
     "queue": "bun scripts/check-pending-queue.ts",
     "queue:process": "bun scripts/check-pending-queue.ts --process",
     "queue:clear:pending": "bun scripts/clear-pending-queue.ts --all --force",
