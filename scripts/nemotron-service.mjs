@@ -25,6 +25,7 @@ const VENV_DIR = join(ROOT, 'venv');
 const PYTHON = join(VENV_DIR, 'bin', 'python');
 const LOG_DIR = join(homedir(), '.claude-mem', 'logs');
 const SETTINGS_PATH = join(homedir(), '.claude-mem', 'settings.json');
+const TELEMETRY_PATH = join(homedir(), '.claude-mem', 'telemetry.json');
 const PLIST = join(homedir(), 'Library', 'LaunchAgents', `${LABEL}.plist`);
 const SOURCE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'services', 'nemotron');
 const HEALTH_URL = `http://127.0.0.1:${PORT}`;
@@ -115,6 +116,8 @@ ${argXml}
     <string>${PORT}</string>
     <key>CLAUDE_MEM_NEMOTRON_DATA_DIR</key>
     <string>${xml(join(homedir(), '.claude-mem', 'nemotron'))}</string>
+    <key>ANONYMIZED_TELEMETRY</key>
+    <string>false</string>
 ${optionalEnvironment ? `${optionalEnvironment}\n` : ''}    <key>PATH</key>
     <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
   </dict>
@@ -158,6 +161,32 @@ function updateSettings(updates) {
     mode: 0o600,
   });
   renameSync(temporaryPath, SETTINGS_PATH);
+}
+
+function disableClaudeMemTelemetry() {
+  let telemetry = {};
+  if (existsSync(TELEMETRY_PATH)) {
+    try {
+      const parsed = JSON.parse(readFileSync(TELEMETRY_PATH, 'utf8'));
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        telemetry = parsed;
+      }
+    } catch (error) {
+      throw new Error(`Cannot safely update ${TELEMETRY_PATH}: ${error.message}`);
+    }
+  }
+  const next = {
+    ...telemetry,
+    enabled: false,
+    installId: typeof telemetry.installId === 'string' ? telemetry.installId : '',
+    decidedAt: new Date().toISOString(),
+  };
+  const temporaryPath = `${TELEMETRY_PATH}.nemotron-${process.pid}.tmp`;
+  writeFileSync(temporaryPath, `${JSON.stringify(next, null, 2)}\n`, {
+    encoding: 'utf8',
+    mode: 0o600,
+  });
+  renameSync(temporaryPath, TELEMETRY_PATH);
 }
 
 async function fetchJson(path, options) {
@@ -244,10 +273,12 @@ async function install() {
     CLAUDE_MEM_NEMOTRON_REQUEST_TIMEOUT_MS: '180000',
     CLAUDE_MEM_SEMANTIC_INJECT: 'true',
   });
+  disableClaudeMemTelemetry();
   process.stdout.write(
     `Nemotron service ready on ${HEALTH_URL} (${health.model.device}, ` +
       `${health.model.embedding_dimensions} dimensions, ` +
-      `${health.model.load_seconds?.toFixed?.(2) ?? health.model.load_seconds}s load).\n`,
+      `${health.model.load_seconds?.toFixed?.(2) ?? health.model.load_seconds}s load). ` +
+      'Claude-Mem and Chroma telemetry are disabled.\n',
   );
 }
 

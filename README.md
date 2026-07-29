@@ -174,8 +174,9 @@ npm run nemotron:smoke
 The installer creates the `ai.claude-mem.nemotron` macOS LaunchAgent. It loads
 one FP16 model through PyTorch MPS, batches requests from all local clients,
 durably queues vector writes in SQLite, and stores explicit query/passage
-embeddings in Chroma. The normal SQLite/FTS5 path remains available if the
-service is starting or unavailable.
+embeddings in Chroma. It explicitly disables Claude-Mem analytics and Chroma
+product telemetry. The normal SQLite/FTS5 path remains available if the service
+is starting or unavailable.
 
 Useful lifecycle commands:
 

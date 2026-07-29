@@ -103,7 +103,9 @@ The install command copies the service into a stable per-user runtime, creates
 or reuses a Python 3.11 virtual environment with `uv`, registers the
 LaunchAgent, downloads the model through Hugging Face on first use, waits for
 readiness, and atomically enables Nemotron plus semantic injection in
-`~/.claude-mem/settings.json`.
+`~/.claude-mem/settings.json`. It also records an explicit Claude-Mem telemetry
+opt-out in `~/.claude-mem/telemetry.json` and starts Chroma with anonymous
+product telemetry disabled.
 
 ```bash
 npm run nemotron:stop
@@ -143,6 +145,18 @@ Claude-Mem settings live in `~/.claude-mem/settings.json`:
 
 Set `CLAUDE_MEM_EMBEDDING_PROVIDER=chroma` to restore the upstream
 `chroma-mcp` MiniLM path.
+
+## Network boundary
+
+Memory databases, generated observations, embeddings, vector searches, and the
+web viewer remain local. Cloud sync is off unless its URL and credentials are
+explicitly configured. Claude-Mem analytics and Chroma product telemetry are
+disabled by the installer.
+
+The configured Claude provider still receives session activity to generate
+compact observations and summaries. Hugging Face remains reachable so the
+Nemotron checkpoint can be downloaded and its cache checked; package managers
+and GitHub are contacted only when installing or updating dependencies/source.
 
 ## Mac resource profile
 

@@ -98,6 +98,11 @@ def create_app(settings: ServiceSettings | None = None) -> FastAPI:
             "embedding_queue": state.batcher.status(),
             "durable_write_queue": await state.jobs.status(),
             "vector_path": str(state.settings.chroma_dir),
+            "privacy": {
+                "chroma_anonymized_telemetry": (
+                    state.store.client.get_settings().anonymized_telemetry
+                ),
+            },
         }
 
     @app.get("/readyz")

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import chromadb
+from chromadb.config import Settings as ChromaSettings
 
 from .model import EmbeddingBatcher
 
@@ -31,7 +32,10 @@ class NemotronVectorStore:
     }
 
     def __init__(self, path: Path, batcher: EmbeddingBatcher):
-        self.client = chromadb.PersistentClient(path=str(path))
+        self.client = chromadb.PersistentClient(
+            path=str(path),
+            settings=ChromaSettings(anonymized_telemetry=False),
+        )
         self.batcher = batcher
         self._store_lock = asyncio.Lock()
 

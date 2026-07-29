@@ -32,6 +32,8 @@ class VectorStoreTest(unittest.IsolatedAsyncioTestCase):
         self.temp_dir.cleanup()
 
     async def test_explicit_embeddings_rank_memory_document_first(self) -> None:
+        self.assertFalse(self.store.client.get_settings().anonymized_telemetry)
+
         await self.store.call(
             "chroma_add_documents",
             {
