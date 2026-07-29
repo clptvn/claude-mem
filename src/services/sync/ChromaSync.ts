@@ -96,6 +96,7 @@ interface StoredUserPrompt {
 }
 
 export class ChromaSync {
+  private static readonly INDEX_FORMAT_VERSION = 2;
   private project: string;
   private collectionName: string;
   private collectionCreated = false;
@@ -179,6 +180,27 @@ export class ChromaSync {
       baseMetadata.files_modified = files_modified.join(',');
     }
 
+    // Multi-granularity retrieval key. LongMemEval found that augmenting the
+    // raw value with fact- and keyword-derived keys materially improves recall.
+    // Keep the original narrative and atomic-fact vectors below; this compact
+    // overview adds a separate "what is this memory about?" representation
+    // without discarding evidence detail.
+    const retrievalKeyParts = [
+      obs.title ? `Title: ${obs.title}` : '',
+      obs.subtitle ? `Context: ${obs.subtitle}` : '',
+      concepts.length > 0 ? `Keywords: ${concepts.join(', ')}` : '',
+      facts.length > 0 ? `Facts:\n${facts.map((fact: string) => `- ${fact}`).join('\n')}` : '',
+      files_read.length > 0 ? `Files read: ${files_read.join(', ')}` : '',
+      files_modified.length > 0 ? `Files modified: ${files_modified.join(', ')}` : '',
+    ].filter(Boolean);
+    if (retrievalKeyParts.length > 0) {
+      documents.push({
+        id: `obs_${obs.id}_retrieval_key`,
+        document: retrievalKeyParts.join('\n'),
+        metadata: { ...baseMetadata, field_type: 'retrieval_key' }
+      });
+    }
+
     if (obs.narrative) {
       documents.push({
         id: `obs_${obs.id}_narrative`,
@@ -221,6 +243,26 @@ export class ChromaSync {
       created_at_epoch: summary.created_at_epoch,
       prompt_number: summary.prompt_number || 0
     };
+
+    // Index a combined summary key in addition to each independent field.
+    // The independent vectors remain best for precise matches; the combined
+    // key preserves enough session-level context for broader and multi-hop
+    // questions.
+    const retrievalKeyParts = [
+      summary.request ? `Request: ${summary.request}` : '',
+      summary.investigated ? `Investigated: ${summary.investigated}` : '',
+      summary.learned ? `Learned: ${summary.learned}` : '',
+      summary.completed ? `Completed: ${summary.completed}` : '',
+      summary.next_steps ? `Next steps: ${summary.next_steps}` : '',
+      summary.notes ? `Notes: ${summary.notes}` : '',
+    ].filter(Boolean);
+    if (retrievalKeyParts.length > 0) {
+      documents.push({
+        id: `summary_${summary.id}_retrieval_key`,
+        document: retrievalKeyParts.join('\n'),
+        metadata: { ...baseMetadata, field_type: 'retrieval_key' }
+      });
+    }
 
     if (summary.request) {
       documents.push({
@@ -1079,6 +1121,7 @@ export class ChromaSync {
 
     ChromaSync.backfillInProgress = true;
     try {
+      ChromaSyncState.ensureIndexFormatVersion(ChromaSync.INDEX_FORMAT_VERSION);
       const projects = store.db.prepare(
         'SELECT DISTINCT project FROM observations WHERE project IS NOT NULL AND project != ?'
       ).all('') as { project: string }[];

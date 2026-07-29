@@ -148,10 +148,13 @@ export const sessionInitHandler: EventHandler = {
 
     if (semanticInject && prompt && prompt.length >= 20 && prompt !== '[media prompt]') {
       const limit = settings.CLAUDE_MEM_SEMANTIC_INJECT_LIMIT || '5';
+      const minimumSimilarity = settings.CLAUDE_MEM_SEMANTIC_INJECT_MIN_SIMILARITY || '0.18';
+      const maxChars = settings.CLAUDE_MEM_SEMANTIC_INJECT_MAX_CHARS || '12000';
+      const maxPerSession = settings.CLAUDE_MEM_SEMANTIC_INJECT_MAX_PER_SESSION || '2';
       const semanticResult = await dependencies.executeWithWorkerFallback<SemanticContextResponse>(
         '/api/context/semantic',
         'POST',
-        { q: prompt, project, limit },
+        { q: prompt, project, limit, minimumSimilarity, maxChars, maxPerSession },
       );
       if (!dependencies.isWorkerFallback(semanticResult) && semanticResult?.context) {
         logger.debug('HOOK', `Semantic injection: ${semanticResult.count} observations for prompt`, { sessionId: sessionDbId, count: semanticResult.count });

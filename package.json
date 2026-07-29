@@ -78,6 +78,7 @@
     "nemotron:stop": "node scripts/nemotron-service.mjs stop",
     "nemotron:uninstall": "node scripts/nemotron-service.mjs uninstall",
     "nemotron:smoke": "node scripts/nemotron-service.mjs smoke",
+    "eval:memory": "bun benchmarks/memory-retrieval/evaluate.ts",
     "queue": "bun scripts/check-pending-queue.ts",
     "queue:process": "bun scripts/check-pending-queue.ts --process",
     "queue:clear:pending": "bun scripts/clear-pending-queue.ts --all --force",

@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it, mock } from 'bun:test';
-import { mkdtempSync } from 'fs';
+import { mkdtempSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import * as realChromaMcpManager from '../../../src/services/sync/ChromaMcpManager.js';
@@ -149,6 +149,34 @@ describe('ChromaSync watermark gap persistence', () => {
 
     expect(ChromaSyncState.get(project).observations).toBe(4);
     expect(ChromaSyncState.getPending(project, 'observations')).toEqual([2]);
+  });
+
+  it('resets watermarks exactly once when the vector document format changes', () => {
+    ChromaSyncState.replace(project, {
+      observations: 9,
+      summaries: 4,
+      prompts: 7,
+      pending: { observations: [2] },
+    });
+
+    expect(ChromaSyncState.ensureIndexFormatVersion(2)).toBe(true);
+    expect(ChromaSyncState.get(project)).toEqual({
+      observations: 0,
+      summaries: 0,
+      prompts: 0,
+    });
+    expect(JSON.parse(readFileSync(
+      join(process.env.CLAUDE_MEM_DATA_DIR!, 'chroma-index-format.json'),
+      'utf8',
+    ))).toEqual({ version: 2 });
+
+    ChromaSyncState.replace(project, {
+      observations: 3,
+      summaries: 2,
+      prompts: 1,
+    });
+    expect(ChromaSyncState.ensureIndexFormatVersion(2)).toBe(false);
+    expect(ChromaSyncState.get(project).observations).toBe(3);
   });
 
   it('keeps pending observation ids when live sync advances past the gap', async () => {

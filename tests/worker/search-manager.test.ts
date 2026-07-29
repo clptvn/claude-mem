@@ -452,3 +452,161 @@ describe('SearchManager platform-scoped Chroma hydration', () => {
     }));
   });
 });
+
+describe('SearchManager automatic context retrieval', () => {
+  const createdAt = (epoch: number) => new Date(epoch).toISOString();
+
+  it('abstains when every nearest neighbor is below the configured similarity floor', async () => {
+    const queryChroma = mock(() => Promise.resolve({
+      ids: [1, 2],
+      distances: [0.86, 0.91],
+      metadatas: [
+        { sqlite_id: 1, doc_type: 'observation', field_type: 'fact' },
+        { sqlite_id: 2, doc_type: 'session_summary', field_type: 'learned' },
+      ],
+    }));
+    const manager = new SearchManager(
+      {} as any,
+      {
+        getObservationsByIds: mock(() => {
+          throw new Error('weak candidates must not be hydrated');
+        }),
+        getSessionSummariesByIds: mock(() => {
+          throw new Error('weak candidates must not be hydrated');
+        }),
+      } as any,
+      { queryChroma } as any,
+      {} as any,
+      {} as any,
+    );
+
+    const result = await manager.retrieveContext({
+      query: 'compose a haiku about purple otters on Mars',
+      project: 'memory-project',
+      minimumSimilarity: 0.18,
+    });
+
+    expect(result.candidates).toEqual([]);
+    expect(result.considered).toBe(2);
+    expect(result.rejectedLowConfidence).toBe(2);
+  });
+
+  it('globally ranks observations and summaries while preserving the matched vector field', async () => {
+    const now = Date.now();
+    const queryChroma = mock(() => Promise.resolve({
+      ids: [20, 10],
+      distances: [0.22, 0.28],
+      metadatas: [
+        {
+          sqlite_id: 20,
+          doc_type: 'session_summary',
+          field_type: 'learned',
+          created_at_epoch: now,
+        },
+        {
+          sqlite_id: 10,
+          doc_type: 'observation',
+          field_type: 'fact',
+          created_at_epoch: now - 1000,
+        },
+      ],
+    }));
+    const manager = new SearchManager(
+      {} as any,
+      {
+        getObservationsByIds: mock(() => [{
+          id: 10,
+          memory_session_id: 'session-observation',
+          title: 'Nemotron service decision',
+          narrative: 'The embedding service stays local.',
+          facts: JSON.stringify(['It listens only on loopback.']),
+          created_at: createdAt(now - 1000),
+          created_at_epoch: now - 1000,
+        }]),
+        getSessionSummariesByIds: mock(() => [{
+          id: 20,
+          memory_session_id: 'session-summary',
+          request: 'Improve automatic memory retrieval',
+          investigated: 'Weak-neighbor injection',
+          learned: 'The system must abstain below a calibrated floor.',
+          completed: null,
+          next_steps: null,
+          notes: null,
+          created_at: createdAt(now),
+          created_at_epoch: now,
+        }]),
+      } as any,
+      { queryChroma } as any,
+      {} as any,
+      {} as any,
+    );
+
+    const result = await manager.retrieveContext({
+      query: 'how should automatic memory retrieval abstain',
+      project: 'memory-project',
+      limit: 2,
+    });
+
+    expect(result.candidates.map(candidate => candidate.kind)).toEqual([
+      'session_summary',
+      'observation',
+    ]);
+    expect(result.candidates[0].matchedField).toBe('learned');
+    expect(result.candidates[1].body).toContain('It listens only on loopback.');
+  });
+
+  it('keeps the newest repeated state unless the query explicitly asks for history', async () => {
+    const oldEpoch = Date.now() - 86_400_000;
+    const newEpoch = Date.now();
+    const rows = [
+      {
+        id: 1,
+        memory_session_id: 'old-session',
+        title: 'Worker port configuration',
+        narrative: 'The worker listens on port 37700.',
+        facts: '[]',
+        created_at: createdAt(oldEpoch),
+        created_at_epoch: oldEpoch,
+      },
+      {
+        id: 2,
+        memory_session_id: 'new-session',
+        title: 'Worker port configuration',
+        narrative: 'The worker listens on port 37701.',
+        facts: '[]',
+        created_at: createdAt(newEpoch),
+        created_at_epoch: newEpoch,
+      },
+    ];
+    const queryChroma = mock(() => Promise.resolve({
+      ids: [1, 2],
+      distances: [0.20, 0.21],
+      metadatas: [
+        { sqlite_id: 1, doc_type: 'observation', field_type: 'narrative' },
+        { sqlite_id: 2, doc_type: 'observation', field_type: 'narrative' },
+      ],
+    }));
+    const manager = new SearchManager(
+      {} as any,
+      {
+        getObservationsByIds: mock(() => rows),
+        getSessionSummariesByIds: mock(() => []),
+      } as any,
+      { queryChroma } as any,
+      {} as any,
+      {} as any,
+    );
+
+    const current = await manager.retrieveContext({
+      query: 'what port does the worker use',
+      project: 'memory-project',
+    });
+    expect(current.candidates.map(candidate => candidate.id)).toEqual([2]);
+
+    const historical = await manager.retrieveContext({
+      query: 'what port did the worker previously use',
+      project: 'memory-project',
+    });
+    expect(historical.candidates.map(candidate => candidate.id)).toEqual([1]);
+  });
+});

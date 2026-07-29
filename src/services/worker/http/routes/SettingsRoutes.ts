@@ -112,6 +112,11 @@ export class SettingsRoutes extends BaseRouteHandler {
       'CLAUDE_MEM_CONTEXT_SHOW_LAST_SUMMARY',
       'CLAUDE_MEM_CONTEXT_SHOW_LAST_MESSAGE',
       'CLAUDE_MEM_FOLDER_CLAUDEMD_ENABLED',
+      'CLAUDE_MEM_SEMANTIC_INJECT',
+      'CLAUDE_MEM_SEMANTIC_INJECT_LIMIT',
+      'CLAUDE_MEM_SEMANTIC_INJECT_MIN_SIMILARITY',
+      'CLAUDE_MEM_SEMANTIC_INJECT_MAX_CHARS',
+      'CLAUDE_MEM_SEMANTIC_INJECT_MAX_PER_SESSION',
     ];
 
     for (const key of settingKeys) {
@@ -216,6 +221,7 @@ export class SettingsRoutes extends BaseRouteHandler {
       'CLAUDE_MEM_CONTEXT_SHOW_SAVINGS_PERCENT',
       'CLAUDE_MEM_CONTEXT_SHOW_LAST_SUMMARY',
       'CLAUDE_MEM_CONTEXT_SHOW_LAST_MESSAGE',
+      'CLAUDE_MEM_SEMANTIC_INJECT',
     ];
 
     for (const key of booleanSettings) {
@@ -235,6 +241,34 @@ export class SettingsRoutes extends BaseRouteHandler {
       const count = parseInt(settings.CLAUDE_MEM_CONTEXT_SESSION_COUNT, 10);
       if (isNaN(count) || count < 1 || count > 50) {
         return { valid: false, error: 'CLAUDE_MEM_CONTEXT_SESSION_COUNT must be between 1 and 50' };
+      }
+    }
+
+    if (settings.CLAUDE_MEM_SEMANTIC_INJECT_LIMIT) {
+      const count = parseInt(settings.CLAUDE_MEM_SEMANTIC_INJECT_LIMIT, 10);
+      if (isNaN(count) || count < 1 || count > 20) {
+        return { valid: false, error: 'CLAUDE_MEM_SEMANTIC_INJECT_LIMIT must be between 1 and 20' };
+      }
+    }
+
+    if (settings.CLAUDE_MEM_SEMANTIC_INJECT_MIN_SIMILARITY) {
+      const similarity = Number(settings.CLAUDE_MEM_SEMANTIC_INJECT_MIN_SIMILARITY);
+      if (!Number.isFinite(similarity) || similarity < -1 || similarity > 1) {
+        return { valid: false, error: 'CLAUDE_MEM_SEMANTIC_INJECT_MIN_SIMILARITY must be between -1 and 1' };
+      }
+    }
+
+    if (settings.CLAUDE_MEM_SEMANTIC_INJECT_MAX_CHARS) {
+      const chars = parseInt(settings.CLAUDE_MEM_SEMANTIC_INJECT_MAX_CHARS, 10);
+      if (isNaN(chars) || chars < 1000 || chars > 100000) {
+        return { valid: false, error: 'CLAUDE_MEM_SEMANTIC_INJECT_MAX_CHARS must be between 1000 and 100000' };
+      }
+    }
+
+    if (settings.CLAUDE_MEM_SEMANTIC_INJECT_MAX_PER_SESSION) {
+      const count = parseInt(settings.CLAUDE_MEM_SEMANTIC_INJECT_MAX_PER_SESSION, 10);
+      if (isNaN(count) || count < 1 || count > 10) {
+        return { valid: false, error: 'CLAUDE_MEM_SEMANTIC_INJECT_MAX_PER_SESSION must be between 1 and 10' };
       }
     }
 

@@ -21,6 +21,11 @@ function statePath(): string {
   return join(dataDir, 'chroma-sync-state.json');
 }
 
+function formatVersionPath(): string {
+  const dataDir = SettingsDefaultsManager.get('CLAUDE_MEM_DATA_DIR');
+  return join(dataDir, 'chroma-index-format.json');
+}
+
 let cache: Record<string, ProjectWatermarks> | null = null;
 
 function normalizePendingIds(ids: unknown): number[] {
@@ -94,6 +99,49 @@ export const ChromaSyncState = {
 
   getPending(project: string, kind: DocKind): number[] {
     return this.get(project).pending?.[kind] ?? [];
+  },
+
+  /**
+   * Reset row watermarks exactly once when the vector document format changes.
+   * Chroma IDs are deterministic, so the ensuing backfill updates existing
+   * vectors in place and adds only the new derived-key documents. Persist the
+   * version before the backfill: per-row watermark bumps then make an
+   * interrupted reindex resumable on the next startup.
+   */
+  ensureIndexFormatVersion(version: number): boolean {
+    if (!Number.isInteger(version) || version < 1) {
+      throw new Error(`Invalid Chroma index format version: ${version}`);
+    }
+    const versionPath = formatVersionPath();
+    if (existsSync(versionPath)) {
+      try {
+        const parsed = JSON.parse(readFileSync(versionPath, 'utf8')) as { version?: unknown };
+        if (parsed.version === version) {
+          return false;
+        }
+      } catch (error) {
+        logger.warn('CHROMA_SYNC', 'Index format marker is unreadable; scheduling safe reindex', {
+          path: versionPath,
+        }, error instanceof Error ? error : new Error(String(error)));
+      }
+    }
+
+    const all = load();
+    for (const project of Object.keys(all)) {
+      all[project] = { ...ZERO };
+    }
+    persist();
+
+    const dataDir = SettingsDefaultsManager.get('CLAUDE_MEM_DATA_DIR');
+    if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true });
+    const tmp = `${versionPath}.tmp`;
+    writeFileSync(tmp, JSON.stringify({ version }, null, 2), 'utf8');
+    renameSync(tmp, versionPath);
+    logger.info('CHROMA_SYNC', 'Vector document format changed; reset watermarks for resumable reindex', {
+      version,
+      projects: Object.keys(all).length,
+    });
+    return true;
   },
 
   bump(project: string, kind: DocKind, id: number): void {

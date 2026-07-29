@@ -52,7 +52,10 @@ export interface SettingsDefaults {
   CLAUDE_MEM_FOLDER_MD_EXCLUDE: string;
   CLAUDE_MEM_FOLDER_MD_SKELETON_DENYLIST: string;
   CLAUDE_MEM_SEMANTIC_INJECT: string;        
-  CLAUDE_MEM_SEMANTIC_INJECT_LIMIT: string;  
+  CLAUDE_MEM_SEMANTIC_INJECT_LIMIT: string;
+  CLAUDE_MEM_SEMANTIC_INJECT_MIN_SIMILARITY: string;
+  CLAUDE_MEM_SEMANTIC_INJECT_MAX_CHARS: string;
+  CLAUDE_MEM_SEMANTIC_INJECT_MAX_PER_SESSION: string;
   CLAUDE_MEM_TIER_ROUTING_ENABLED: string;
   CLAUDE_MEM_TIER_SIMPLE_MODEL: string;
   CLAUDE_MEM_TIER_SUMMARY_MODEL: string;
@@ -153,7 +156,10 @@ export class SettingsDefaultsManager {
     CLAUDE_MEM_FOLDER_MD_EXCLUDE: '[]',  // JSON array of folder paths to exclude from CLAUDE.md generation
     CLAUDE_MEM_FOLDER_MD_SKELETON_DENYLIST: '[]',  // #2400 — JSON array of glob patterns; when a folder matches AND its generated CLAUDE.md would be empty/skeleton, skip injection (avoids polluting non-content dirs with empty skeletons). Default [] preserves existing behavior.
     CLAUDE_MEM_SEMANTIC_INJECT: 'false',             // Enabled by the Nemotron installer after the shared service is ready
-    CLAUDE_MEM_SEMANTIC_INJECT_LIMIT: '5',           // Top-N most relevant observations to inject per prompt
+    CLAUDE_MEM_SEMANTIC_INJECT_LIMIT: '5',           // Top-N globally ranked observations/summaries to inject per prompt
+    CLAUDE_MEM_SEMANTIC_INJECT_MIN_SIMILARITY: '0.18', // Cosine floor: abstain instead of injecting an unrelated nearest neighbor
+    CLAUDE_MEM_SEMANTIC_INJECT_MAX_CHARS: '12000',   // Hard prompt budget for automatically injected memory evidence
+    CLAUDE_MEM_SEMANTIC_INJECT_MAX_PER_SESSION: '2', // Diversity cap so one prior session cannot crowd out all other evidence
     CLAUDE_MEM_TIER_ROUTING_ENABLED: 'true',         // Route observations to models by complexity
     CLAUDE_MEM_TIER_SIMPLE_MODEL: 'haiku', // Portable tier alias — works across Direct API, Bedrock, Vertex, Azure (see #1463)
     CLAUDE_MEM_TIER_SUMMARY_MODEL: '',                // Empty = use default model for summaries

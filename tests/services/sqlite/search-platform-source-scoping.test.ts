@@ -181,6 +181,7 @@ describe('search platform_source scoping', () => {
 
     expect(docs.length).toBeGreaterThan(0);
     expect(docs.every((doc: any) => doc.metadata.platform_source === 'codex')).toBe(true);
+    expect(docs.some((doc: any) => doc.metadata.field_type === 'retrieval_key')).toBe(true);
   });
 
   it('writes platform_source metadata for Chroma summary docs', () => {
@@ -203,5 +204,6 @@ describe('search platform_source scoping', () => {
 
     expect(docs.length).toBeGreaterThan(0);
     expect(docs.every((doc: any) => doc.metadata.platform_source === 'codex')).toBe(true);
+    expect(docs.some((doc: any) => doc.metadata.field_type === 'retrieval_key')).toBe(true);
   });
 });
