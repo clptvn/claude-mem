@@ -18,16 +18,16 @@ import {
 } from './search/index.js';
 import { ResultFormatter } from './search/ResultFormatter.js';
 import { ChromaUnavailableError } from './search/errors.js';
+import {
+  filterCandidatesByConfidence,
+  rankAndSelectContextCandidates,
+} from './context-retrieval-policy.js';
+import type { RankedMemoryCandidate } from './context-retrieval-policy.js';
 
-export interface ContextMemoryCandidate {
+export interface ContextMemoryCandidate extends RankedMemoryCandidate {
   kind: 'observation' | 'session_summary';
   id: number;
-  memorySessionId: string;
-  title: string;
-  body: string;
   createdAt: string;
-  createdAtEpoch: number;
-  similarity: number;
   matchedField: string | null;
 }
 
@@ -49,41 +49,6 @@ function parseStringArray(value: string | null | undefined): string[] {
   } catch {
     return [];
   }
-}
-
-function normalizedMemoryKey(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9_./-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function tokenSet(value: string): Set<string> {
-  return new Set(
-    value
-      .toLowerCase()
-      .match(/[a-z0-9_./-]{3,}/g)
-      ?.filter(token => !['this', 'that', 'with', 'from', 'have', 'were', 'into'].includes(token))
-      ?? []
-  );
-}
-
-function jaccardSimilarity(left: Set<string>, right: Set<string>): number {
-  if (left.size === 0 || right.size === 0) return 0;
-  let intersection = 0;
-  for (const token of left) {
-    if (right.has(token)) intersection += 1;
-  }
-  return intersection / (left.size + right.size - intersection);
-}
-
-function requestsHistoricalState(query: string): boolean {
-  return /\b(previous|previously|before|former|formerly|old|older|original|originally|used to|at the time|history|historical)\b/i.test(query);
-}
-
-function requestsCurrentHistoricalComparison(query: string): boolean {
-  return /\b(compare|comparison|versus|vs\.?|then and now|current and previous|previous and current)\b/i.test(query);
 }
 
 /**
@@ -214,9 +179,11 @@ export class SearchManager {
     // low-quality tail when the first result is strong, while retaining close
     // multi-hop evidence. The 0.24 band was chosen conservatively from local
     // Nemotron calibration fixtures and remains user-configurable.
-    const topSimilarity = Math.max(...raw.map(item => item.similarity));
-    const effectiveFloor = Math.max(configuredFloor, topSimilarity - 0.24);
-    const accepted = raw.filter(item => item.similarity >= effectiveFloor);
+    const confidence = filterCandidatesByConfidence(raw, {
+      minimumSimilarity: configuredFloor,
+      relativeBand: 0.24,
+    });
+    const accepted = confidence.candidates;
 
     const observationIds = accepted
       .filter(item => item.metadata.doc_type === 'observation')
@@ -295,70 +262,21 @@ export class SearchManager {
       }
     }
 
-    const historicalQuery = requestsHistoricalState(args.query);
-    const temporalComparison = requestsCurrentHistoricalComparison(args.query);
-    const candidatesByKey = new Map<string, ContextMemoryCandidate[]>();
-    for (const candidate of hydrated) {
-      const key = normalizedMemoryKey(candidate.title);
-      if (!key) continue;
-      const group = candidatesByKey.get(key) ?? [];
-      group.push(candidate);
-      candidatesByKey.set(key, group);
-    }
-    const newestByKey = new Map<string, ContextMemoryCandidate>();
-    const previousByKey = new Map<string, ContextMemoryCandidate>();
-    for (const [key, group] of candidatesByKey) {
-      const byNewest = [...group].sort((left, right) => right.createdAtEpoch - left.createdAtEpoch);
-      newestByKey.set(key, byNewest[0]);
-      if (byNewest.length > 1) {
-        previousByKey.set(key, byNewest[1]);
-      }
-    }
-
-    const ranked = hydrated
-      .filter(candidate => {
-        const key = normalizedMemoryKey(candidate.title);
-        if (!key || (candidatesByKey.get(key)?.length ?? 0) < 2) return true;
-        if (historicalQuery && !temporalComparison) {
-          return previousByKey.get(key) === candidate;
-        }
-        if (!historicalQuery) {
-          return newestByKey.get(key) === candidate;
-        }
-        return true;
-      })
-      .sort((left, right) => {
-        const scoreDifference = right.similarity - left.similarity;
-        if (Math.abs(scoreDifference) > 0.01) return scoreDifference;
-        return right.createdAtEpoch - left.createdAtEpoch;
-      });
-
-    const selected: ContextMemoryCandidate[] = [];
-    const perSession = new Map<string, number>();
-    const selectedTokens: Set<string>[] = [];
-    for (const candidate of ranked) {
-      if ((perSession.get(candidate.memorySessionId) ?? 0) >= maxPerSession) {
-        continue;
-      }
-      const tokens = tokenSet(`${candidate.title}\n${candidate.body}`);
-      if (selectedTokens.some(existing => jaccardSimilarity(existing, tokens) >= 0.82)) {
-        continue;
-      }
-      selected.push(candidate);
-      selectedTokens.push(tokens);
-      perSession.set(
-        candidate.memorySessionId,
-        (perSession.get(candidate.memorySessionId) ?? 0) + 1,
-      );
-      if (selected.length >= limit) break;
-    }
+    const selected = rankAndSelectContextCandidates(hydrated, {
+      query: args.query,
+      limit,
+      maxPerSession,
+      resolveFreshness: true,
+      deduplicate: true,
+      diversifySessions: true,
+    });
 
     return {
       candidates: selected,
       considered: raw.length,
       rejectedLowConfidence: raw.length - accepted.length,
       rejectedRedundant: Math.max(0, accepted.length - selected.length),
-      effectiveMinimumSimilarity: effectiveFloor,
+      effectiveMinimumSimilarity: confidence.effectiveMinimumSimilarity,
     };
   }
 

@@ -53,3 +53,8 @@ docker/install-test/
 
 # Local session report artifacts (not part of distribution)
 reports/
+
+# Local benchmark inputs, embedding caches, and result artifacts
+benchmarks/memory-retrieval/data/
+benchmarks/memory-retrieval/cache/
+benchmarks/memory-retrieval/runs/
